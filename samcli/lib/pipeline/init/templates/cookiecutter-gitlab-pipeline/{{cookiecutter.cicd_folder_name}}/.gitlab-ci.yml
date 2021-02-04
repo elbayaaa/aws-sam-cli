@@ -1,0 +1,156 @@
+{% set runtime_image = {
+    "nodejs14.x": "node:14",
+    "nodejs12.x": "node:12",
+    "nodejs10.x": "node:10",
+    "python3.8": "python:3.8",
+    "python3.7": "python:3.7",
+    "python3.6": "python:3.6",
+    "python2.7": "python:2.7",
+    "ruby2.7": "ruby:2.7",
+    "ruby2.5": "ruby:2.5",
+    "java11": "openjdk:11",
+    "java8.al2": "openjdk:8",
+    "java8": "openjdk:8",
+    "go1.x": "golang:1",
+    "dotnetcore3.1": "mcr.microsoft.com/dotnet/sdk:3.1",
+    "dotnetcore2.1": "mcr.microsoft.com/dotnet/sdk:2.1"
+  }
+%}
+variables:
+  cfn_template: {{cookiecutter.cfn_template}}
+
+  staging_deployer_role: {{cookiecutter.staging_deployer_role}}
+  staging_cfn_role: {{cookiecutter.staging_cfn_role}}
+  staging_region: {{cookiecutter.staging_region}}
+  staging_artifacts_bucket: {{cookiecutter.staging_artifacts_bucket}}
+
+  prod_deployer_role: {{cookiecutter.prod_deployer_role}}
+  prod_cfn_role: {{cookiecutter.prod_cfn_role}}
+  prod_region: {{cookiecutter.prod_region}}
+  prod_artifacts_bucket: {{cookiecutter.prod_artifacts_bucket}}
+
+stages:
+  - test
+  - build
+  - staging
+  - prod
+
+{% for runtime, functions in cookiecutter.functions | dictsort %}
+unit-test-{{runtime}}:
+  stage: test
+  only:
+    - mainline
+    - /^feature-.*$/
+  image: {{runtime_image[runtime]}}
+  script: |
+    {% if runtime.lower().startswith("python") %}
+    pip install pytest
+    {% for function in functions %}
+    pip install -r ${CI_PROJECT_DIR}/{{function.path}}/requirements.txt
+    {% endfor %}
+    python -m pytest {{cookiecutter.unit_tests_directory}}
+    {% elif runtime.lower().startswith("ruby") %}
+    gem install bundler
+    gem install rake
+
+    {% for function in functions %}
+    bundle install --gemfile ${CI_PROJECT_DIR}/{{function.path}}/Gemfile
+    {% endfor %}
+
+    cat <<-'RAKEFILE' > Rakefile
+    require 'rake/testtask'
+    Rake::TestTask.new do |t|
+      t.test_files = FileList['{{cookiecutter.unit_tests_directory}}/*.rb']
+      t.verbose = true
+    end
+    RAKEFILE
+
+    # run the tests
+    rake test
+    {% else %}
+    - # Add your {{runtime}} unit-test scripts here
+    {% endif %}
+
+{% endfor %}
+
+build-and-deploy-feature:
+  stage: build
+  only:
+    - /^feature-.*$/
+  before_script:
+    - yum install -y jq
+    - python3 -m venv venv && venv/bin/pip install aws-sam-cli
+  script: |
+    . {{cookiecutter.cicd_folder_name}}/assume-role.sh ${staging_region} \
+                          ${staging_deployer_role} \
+                          feature-deployment
+    sam build --template ${cfn_template} --use-container
+    sam deploy --stack-name features-${CI_COMMIT_REF_NAME}-cfn-stack \
+               --capabilities CAPABILITY_IAM \
+               --region ${staging_region} \
+               --s3-bucket ${staging_artifacts_bucket} \
+               --no-fail-on-empty-changeset \
+               --role-arn ${staging_cfn_role}
+build:
+  stage: build
+  only:
+    - mainline
+  before_script:
+    - apt-get install -y python3.8-venv
+    - python3 -m venv venv && venv/bin/pip install aws-sam-cli
+  script: |
+    sam build --template ${cfn_template} --use-container
+
+    sam package \
+          --s3-bucket ${staging_artifacts_bucket} \
+          --region ${staging_region} \
+          --output-template-file packaged-${staging_region}.yaml
+
+    sam package \
+           --s3-bucket ${prod_artifacts_bucket} \
+           --region ${prod_region} \
+           --output-template-file packaged-${prod_region}.yaml
+  artifacts:
+    paths:
+      - packaged-${staging_region}.yaml
+      - packaged-${prod_region}.yaml
+    expire_in: 1 year
+
+deploy-staging:
+  stage: staging
+  only:
+    - mainline
+  image: amazon/aws-sam-cli-build-image-provided
+  before_script:
+    - yum install -y jq
+  script: |
+    . {{cookiecutter.cicd_folder_name}}/assume-role.sh ${staging_region} \
+                          ${staging_deployer_role} \
+                          staging-deployment
+    sam deploy --stack-name staging-cfn-stack \
+               --template packaged-${staging_region}.yaml \
+               --capabilities CAPABILITY_IAM \
+               --region ${staging_region} \
+               --s3-bucket ${staging_artifacts_bucket} \
+               --no-fail-on-empty-changeset \
+               --role-arn ${staging_cfn_role}
+
+deploy-prod:
+  stage: prod
+  when: manual
+  only:
+    - mainline
+  image: amazon/aws-sam-cli-build-image-provided
+  before_script:
+    - yum install -y jq
+  script: |
+    . {{cookiecutter.cicd_folder_name}}/assume-role.sh ${prod_region} \
+                          ${prod_deployer_role} \
+                          prod-deployment
+    sam deploy --stack-name prod-cfn-stack \
+               --template packaged-${prod_region}.yaml \
+               --capabilities CAPABILITY_IAM \
+               --region ${prod_region} \
+               --s3-bucket ${prod_artifacts_bucket} \
+               --no-fail-on-empty-changeset \
+               --role-arn ${prod_cfn_role}

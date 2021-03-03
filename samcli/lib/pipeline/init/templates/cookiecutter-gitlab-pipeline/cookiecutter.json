@@ -1,0 +1,16 @@
+{
+  "cicd_folder_name": "cicd",
+  "cfn_template": "template.yml",
+  "has_aws_resources": "False",
+  "artifacts_account_profile_name": "",
+  "staging_account_profile_name": "",
+  "prod_account_profile_name": "",
+  "staging_deployer_role": "arn:aws:iam::633305780106:role/cicd-deployment-resources-DeployerRole-RKAEJYNY65T2",
+  "staging_cfn_role":  "arn:aws:iam::633305780106:role/cicd-deployment-resources-CFNDeploymentRole-19O8H7F5GU77S",
+  "staging_region": "eu-west-1",
+  "staging_artifacts_bucket":  "application-artifacts-eu-west-1-380564965876",
+  "prod_deployer_role": "arn:aws:iam::882766606091:role/cicd-deployment-resources-DeployerRole-CACME3J1D4J9",
+  "prod_cfn_role":  "arn:aws:iam::882766606091:role/cicd-deployment-resources-CFNDeploymentRole-1JXAL70RGW8ZD",
+  "prod_region": "us-east-2",
+  "prod_artifacts_bucket":  "application-artifacts-us-east-2-380564965876"
+}

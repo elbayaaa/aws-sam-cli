@@ -1,5 +1,5 @@
-from samcli.lib.pipeline.init.templates import template as PipelineTemplate
+from samcli.lib.cookiecutter.template import Template as CookiecutterTemplate
 
 
-def do_generate(template: PipelineTemplate, **template_context):
+def do_generate(template: CookiecutterTemplate, **template_context):
     template.generate_project(template_context)

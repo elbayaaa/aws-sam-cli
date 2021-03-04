@@ -1,0 +1,88 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  DeployerArn:
+    Type: String
+  DeploymentAccountsIAMRoleArns:
+    Type: List<String>
+
+Resources:
+  ArtifactsBucketKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: Artifact encryption/decryption cmk
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: '2012-10-17'
+        Id: !Ref AWS::StackName
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
+            Action: kms:*
+            Resource: '*'
+          - Effect: Allow
+            Principal:
+              AWS: !Ref DeployerArn
+            Action:
+              - kms:Encrypt
+              - kms:Decrypt
+              - kms:ReEncrypt*
+              - kms:GenerateDataKey*
+              - kms:DescribeKey
+            Resource: '*'
+          - Effect: Allow
+            Principal:
+              AWS: !Ref DeploymentAccountsIAMRoleArns
+            Action:
+              - kms:Decrypt
+              - kms:DescribeKey
+            Resource: '*'
+
+  ArtifactsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              KMSMasterKeyID: !GetAtt ArtifactsBucketKey.Arn
+              SSEAlgorithm: aws:kms
+
+  ArtifactsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ArtifactsBucket
+      PolicyDocument:
+        Statement:
+          - Effect: "Allow"
+            Action:
+              - 's3:GetObject*'
+              - 's3:PutObject*'
+              - 's3:GetBucket*'
+              - 's3:List*'
+            Resource:
+              - !Join ['',['arn:aws:s3:::',!Ref ArtifactsBucket, '/*']]
+              - !Join ['',['arn:aws:s3:::',!Ref ArtifactsBucket]]
+            Principal:
+              AWS: !Ref DeployerArn
+          - Effect: "Allow"
+            Action:
+              - 's3:GetObject*'
+              - 's3:PutObject*'
+              - 's3:GetBucket*'
+              - 's3:List*'
+            Resource:
+              - !Join ['',['arn:aws:s3:::',!Ref ArtifactsBucket, '/*']]
+              - !Join ['',['arn:aws:s3:::',!Ref ArtifactsBucket]]
+            Principal:
+              AWS: !Ref DeploymentAccountsIAMRoleArns
+Outputs:
+  ArtifactsBucket:
+    Description: Name of the Artifacts bucket
+    Value: !Ref ArtifactsBucket
+  ArtifactsBucketKey:
+    Description: ARN of the CMK used for Artifacts bucket encryption/decryption
+    Value: !GetAtt ArtifactsBucketKey.Arn

@@ -1,0 +1,43 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  DeployerRoleName:
+    Type: String
+  CFNDeploymentRoleName:
+    Type: String
+  ArtifactsBucket:
+    Type: String
+  ArtifactsBucketKey:
+    Type: String
+
+Resources:
+  PermissionPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: ArtifactsPermissions
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - 's3:GetObject*'
+              - 's3:PutObject*'
+              - 's3:GetBucket*'
+              - 's3:List*'
+            Resource:
+              - !Join ['',[ 'arn:aws:s3:::',!Ref ArtifactsBucket, '/*' ] ]
+              - !Join ['',[ 'arn:aws:s3:::',!Ref ArtifactsBucket ] ]
+          - Effect: Allow
+            Action:
+              - 'kms:Decrypt'
+              - 'kms:DescribeKey'
+            Resource: !Ref ArtifactsBucketKey
+
+      Roles:
+        - !Ref DeployerRoleName
+        - !Ref CFNDeploymentRoleName
+Outputs:
+  PermissionPolicy:
+    Description: Grant the deployer IAM Roles read permission to the artifacts bucket
+    Value: !Ref PermissionPolicy

@@ -14,7 +14,7 @@ from cookiecutter import utils
 _root_path = str(pathlib.Path(os.path.dirname(__file__)))
 
 PIPELINE_TEMPLATE_MAPPING = {
-    "gitlab": os.path.join(_root_path, "cookiecutter-gitlab-pipeline"),
+    "gitlab": os.path.join(_root_path, "cookiecutter-gitlab-two-stages-pipeline"),
 }
 
 class Template:

@@ -1,0 +1,21 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Resources:
+  Deployer:
+    Type: AWS::IAM::User
+    Properties:
+      Policies:
+        - PolicyName: AssumeRoles
+          PolicyDocument: |
+            {
+                "Version": "2012-10-17",
+                "Statement": [{
+                    "Effect": "Allow",
+                    "Action": ["sts:AssumeRole"],
+                    "Resource": "*"
+                }]
+            }
+Outputs:
+  Deployer:
+    Description: ARN of the IAM User(Deployer)
+    Value: !GetAtt Deployer.Arn

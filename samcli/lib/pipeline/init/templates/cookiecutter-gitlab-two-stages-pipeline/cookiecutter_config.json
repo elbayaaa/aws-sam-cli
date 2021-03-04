@@ -1,0 +1,94 @@
+{
+  "Questions": [
+    {
+      "key": "name",
+      "question": "What is your name?"
+    },
+    {
+      "key": "intro",
+      "question": "This pipeline template deploys to a testing(staging) and a production AWS accounts. It requires the following AWS resources:\n\t1. A S3 bucket in each AWS region the application is going to be deployed to.\n\t2. An IAM user with read/write access to the S3 buckets and having its credentials shared with your Gitlab project.\n\t3. An IAM role defined in the testing account and can be assumed by the IAM user, it must have read permissions to the S3 bucket of the region and create/execute CFN stacks permissions.\n\t4. An IAM Role that can be passed by the previous role to CloudFormation with enough permissions to create the stack.\n\t5. similar IAM roles to the two above for the production account.",
+      "kind": "info"
+    },
+    {
+      "key": "has_aws_resources",
+      "question": "Do you already have these resources?",
+      "kind": "confirm",
+      "isRequired": true,
+      "nextQuestion": {
+        "True": "staging_artifacts_bucket",
+        "False": "accounts_profiles_names"
+      }
+    },
+    {
+      "key": "accounts_profiles_names",
+      "question": "No worries, we will create these resources for you.\nWe recommend using a separated AWS account to hold the deployment artifacts and a separate account for each stage but you can use the same account if you wish.\nWe are going to use aws cli Named profiles(https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-profiles.html) to create the resources in the correct account. If you don't already setup a named profile for each account, please abort now, create them and restart the process.",
+      "kind":  "info"
+    },
+    {
+      "key": "artifacts_account_profile_name",
+      "question": "What is the artifacts account profile name?",
+      "isRequired": true
+    },
+    {
+      "key": "staging_account_profile_name",
+      "question": "What is the testing account profile name?",
+      "isRequired": true
+    },
+    {
+      "key": "prod_account_profile_name",
+      "question": "What is the production account profile name?",
+      "isRequired": true,
+      "nextQuestion": {
+        "*": "staging_region"
+      }
+    },
+    {
+      "key": "staging_artifacts_bucket",
+      "question": "What is the name of the S3 bucket to host the build artifacts?",
+      "isRequired": true
+    },
+    {
+      "key": "staging_deployer_role",
+      "question": "The testing AWS account must define an IAM Role that can be assumed by the IAM User you provided its credentials to Gitlab.\nWhat is the ARN of this IAM Role?",
+      "isRequired": true
+    },
+    {
+      "key": "staging_cfn_role",
+      "question": "Another IAM Role to be assumed by cloudformation to create your stack resources is also required.\nWhat is the ARN of this IAM Role?",
+      "isRequired": true
+    },
+    {
+      "key": "prod_artifacts_bucket",
+      "question": "What is the name of the S3 bucket to host the build artifacts?",
+      "isRequired": true
+    },
+    {
+      "key": "prod_deployer_role",
+      "question": "What is the ARN of the deployer IAM Role?",
+      "isRequired": true
+    },
+    {
+      "key": "prod_cfn_role",
+      "question": "What is the ARN of the CFN IAM Role?",
+      "isRequired": true
+    },
+    {
+      "key": "staging_region",
+      "question": "Which AWS region will your testing stage be deployed to?",
+      "default": "us-west-2",
+      "isRequired": true
+    },
+    {
+      "key": "prod_region",
+      "question": "Which AWS region will your production stage be deployed to?",
+      "default": "us-east-1",
+      "isRequired": true
+    },
+    {
+      "key": "cfn_template",
+      "question": "What is the location of the SAM template?",
+      "default": "template.yaml",
+      "isRequired": true
+    }
+  ]
+}

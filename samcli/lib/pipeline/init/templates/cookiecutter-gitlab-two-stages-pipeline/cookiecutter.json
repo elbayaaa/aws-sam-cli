@@ -1,0 +1,18 @@
+{
+  "cicd_folder_name": "cicd",
+  "sam_template": "template.yml",
+  "build_image": "",
+  "main_git_branch": "",
+  "deployer_aws_access_key_id_variable_name": "False",
+  "deployer_aws_secret_access_key_variable_name": "False",
+  "testing_deployer_role": "",
+  "testing_cfn_deployment_role":  "",
+  "testing_region": "",
+  "testing_artifacts_bucket":  "",
+  "testing_stack_name":  "",
+  "prod_deployer_role": "",
+  "prod_cfn_deployment_role":  "",
+  "prod_region": "",
+  "prod_artifacts_bucket":  "",
+  "prod_stack_name":  ""
+}

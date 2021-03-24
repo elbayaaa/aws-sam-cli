@@ -1,0 +1,120 @@
+variables:
+  sam_template: {{cookiecutter.sam_template}}
+  build_image: {{cookiecutter.build_image}}
+  aws_access_key_id_: ${{cookiecutter.deployer_aws_access_key_id_variable_name}}
+  aws_secret_access_key_: ${{cookiecutter.deployer_aws_secret_access_key_variable_name}}
+
+  testing_deployer_role: {{cookiecutter.testing_deployer_role}}
+  testing_cfn_deployment_role: {{cookiecutter.testing_cfn_deployment_role}}
+  testing_region: {{cookiecutter.testing_region}}
+  testing_artifacts_bucket: {{cookiecutter.testing_artifacts_bucket}}
+  testing_stack_name: {{cookiecutter.testing_stack_name}}
+
+  prod_deployer_role: {{cookiecutter.prod_deployer_role}}
+  prod_cfn_role: {{cookiecutter.prod_cfn_deployment_role}}
+  prod_region: {{cookiecutter.prod_region}}
+  prod_artifacts_bucket: {{cookiecutter.prod_artifacts_bucket}}
+  prod_stack_name: {{cookiecutter.prod_stack_name}}
+
+image: {{cookiecutter.build_image}}
+stages:
+  - test
+  - build
+  - testing
+  - prod
+
+# uncomment and modify the following step for running the unit-tests
+#
+#unit-test:
+#  stage: test
+#  only:
+#    - {{cookiecutter.main_git_branch}}
+#    - /^feature-.*$/
+#  script: |
+#    Assuming python runtime
+#    pip install pytest
+#    pip install -r /path/to/requirements.txt
+#    python -m pytest /path/to/unit-tests
+
+build-and-deploy-feature:
+  stage: build
+  only:
+    - /^feature-.*$/
+  script: |
+    . {{cookiecutter.cicd_folder_name}}/assume-role.sh ${testing_region} \
+                                                       ${testing_deployer_role} \
+                                                       feature-deployment
+    sam build --template ${sam_template}
+    sam deploy --stack-name features-${CI_COMMIT_REF_NAME}-cfn-stack \
+               --capabilities CAPABILITY_IAM \
+               --region ${testing_region} \
+               --s3-bucket ${testing_artifacts_bucket} \
+               --no-fail-on-empty-changeset \
+               --no-confirm-changeset \
+               --role-arn ${testing_cfn_deployment_role}
+build:
+  stage: build
+  only:
+    - {{cookiecutter.main_git_branch}}
+  script: |
+    sam build --template ${sam_template}
+
+    . {{cookiecutter.cicd_folder_name}}/assume-role.sh ${testing_region} \
+                                                       ${testing_deployer_role} \
+                                                       testing-stage-packaging
+
+    sam package \
+          --s3-bucket ${testing_artifacts_bucket} \
+          --region ${testing_region} \
+          --output-template-file packaged-testing.yaml
+
+    . {{cookiecutter.cicd_folder_name}}/assume-role.sh ${prod_region} \
+                                                       ${prod_deployer_role} \
+                                                       prod-stage-packaging
+
+    sam package \
+           --s3-bucket ${prod_artifacts_bucket} \
+           --region ${prod_region} \
+           --output-template-file packaged-prod.yaml
+  artifacts:
+    paths:
+      - packaged-testing.yaml
+      - packaged-prod.yaml
+    expire_in: 1 year
+
+deploy-testing:
+  stage: testing
+  only:
+    - {{cookiecutter.main_git_branch}}
+  script: |
+    . {{cookiecutter.cicd_folder_name}}/assume-role.sh ${testing_region} \
+                                                       ${testing_deployer_role} \
+                                                       testing-deployment
+
+    sam deploy --stack-name ${testing_stack_name} \
+               --template packaged-testing.yaml \
+               --capabilities CAPABILITY_IAM \
+               --region ${testing_region} \
+               --s3-bucket ${testing_artifacts_bucket} \
+               --no-fail-on-empty-changeset \
+               --no-confirm-changeset \
+               --role-arn ${testing_cfn_deployment_role}
+
+deploy-prod:
+  stage: prod
+  # uncomment this to have a manual approval step before deployment to production
+  #  when: manual
+  only:
+    - {{cookiecutter.main_git_branch}}
+  script: |
+    . {{cookiecutter.cicd_folder_name}}/assume-role.sh ${prod_region} \
+                                                       ${prod_deployer_role} \
+                                                       prod-deployment
+    sam deploy --stack-name ${prod_stack_name} \
+               --template packaged-prod.yaml \
+               --capabilities CAPABILITY_IAM \
+               --region ${prod_region} \
+               --s3-bucket ${prod_artifacts_bucket} \
+               --no-fail-on-empty-changeset \
+               --no-confirm-changeset \
+               --role-arn ${prod_cfn_role}
